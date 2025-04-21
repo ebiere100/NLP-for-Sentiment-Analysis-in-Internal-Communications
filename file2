@@ -1,0 +1,113 @@
+import random
+import pandas as pd
+import numpy as np
+import re
+import string
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+
+# 1. Generate Synthetic Internal Communication Messages
+def generate_synthetic_messages(n=1000):
+    positive = [
+        "Great job on the project!",
+        "Really impressed with your dedication.",
+        "Well done on the client report.",
+        "Excellent work on the deployment.",
+        "Appreciate the quick response."
+    ]
+    neutral = [
+        "The meeting is rescheduled to 3 PM.",
+        "Submit the timesheet by Friday.",
+        "Reminder: team check-in tomorrow.",
+        "The report has been sent to HR.",
+        "Your access has been approved."
+    ]
+    negative = [
+        "This performance is below expectations.",
+        "We missed the target again.",
+        "There are serious issues with the delivery.",
+        "The client is not satisfied.",
+        "Your response was delayed."
+    ]
+
+    data = []
+    for _ in range(n):
+        sentiment = random.choices(["positive", "neutral", "negative"], weights=[0.4, 0.3, 0.3])[0]
+        if sentiment == "positive":
+            msg = random.choice(positive)
+        elif sentiment == "neutral":
+            msg = random.choice(neutral)
+        else:
+            msg = random.choice(negative)
+        data.append((msg, sentiment))
+    return pd.DataFrame(data, columns=["message", "sentiment"])
+
+# 2. Text Preprocessing
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r"http\S+|www\S+", '', text)
+    text = re.sub(r'@\w+|\#', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
+    return text.strip()
+
+# 3. Main Pipeline
+def main():
+    # Load and clean data
+    df = generate_synthetic_messages(1500)
+    df['clean_text'] = df['message'].apply(preprocess_text)
+
+    label_map = {'positive': 2, 'neutral': 1, 'negative': 0}
+    df['label'] = df['sentiment'].map(label_map)
+
+    # Tokenization
+    tokenizer = Tokenizer(num_words=5000, oov_token="<OOV>")
+    tokenizer.fit_on_texts(df['clean_text'])
+    sequences = tokenizer.texts_to_sequences(df['clean_text'])
+
+    max_len = max(len(seq) for seq in sequences)
+    padded = pad_sequences(sequences, maxlen=max_len, padding='post')
+
+    # Train-Test split
+    X_train, X_test, y_train, y_test = train_test_split(padded, df['label'], test_size=0.2, random_state=42)
+
+    # One-hot encoding labels
+    y_train_cat = to_categorical(y_train, num_classes=3)
+    y_test_cat = to_categorical(y_test, num_classes=3)
+
+    # Model
+    model = Sequential()
+    model.add(Embedding(input_dim=5000, output_dim=64, input_length=max_len))
+    model.add(LSTM(64, return_sequences=False))
+    model.add(Dropout(0.3))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(3, activation='softmax'))
+
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    # Train
+    history = model.fit(X_train, y_train_cat, epochs=10, validation_data=(X_test, y_test_cat), batch_size=32)
+
+    # Evaluate
+    y_pred_prob = model.predict(X_test)
+    y_pred = np.argmax(y_pred_prob, axis=1)
+
+    print("Classification Report:\n", classification_report(y_test, y_pred, target_names=label_map.keys()))
+
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_map.keys(), yticklabels=label_map.keys())
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+
+if __name__ == "__main__":
+    main()
