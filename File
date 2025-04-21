@@ -1,0 +1,96 @@
+# NLP for Sentiment Analysis in Internal Communications using Synthetic Data
+
+import random
+import pandas as pd
+import numpy as np
+import re
+import string
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Generate Synthetic Data
+def generate_synthetic_messages(n=500):
+    positive_templates = [
+        "Great job on the project!",
+        "I'm really impressed with the results.",
+        "Keep up the excellent work.",
+        "The presentation was very well done.",
+        "Thanks for your support and dedication.",
+    ]
+    neutral_templates = [
+        "Please attend the meeting at 2 PM.",
+        "This is to inform you of the new update.",
+        "Check the latest figures attached.",
+        "Let’s reschedule our one-on-one.",
+        "The document is ready for review.",
+    ]
+    negative_templates = [
+        "We need to address performance issues.",
+        "This is below expectations.",
+        "I’m disappointed with the delivery.",
+        "We missed the deadline again.",
+        "There were multiple errors in the report.",
+    ]
+
+    data = []
+    for _ in range(n):
+        sentiment = random.choices(["positive", "neutral", "negative"], weights=[0.4, 0.3, 0.3])[0]
+        if sentiment == "positive":
+            msg = random.choice(positive_templates)
+        elif sentiment == "neutral":
+            msg = random.choice(neutral_templates)
+        else:
+            msg = random.choice(negative_templates)
+        data.append((msg, sentiment))
+    return pd.DataFrame(data, columns=["message", "sentiment"])
+
+# 2. Preprocess Text
+def preprocess_text(text):
+    text = text.lower()
+    text = re.sub(r"http\S+|www\S+|https\S+", '', text)
+    text = re.sub(r'\@\w+|\#', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
+    return text.strip()
+
+# 3. Main Pipeline
+def main():
+    df = generate_synthetic_messages(1000)
+    df['clean_text'] = df['message'].apply(preprocess_text)
+
+    # Encode target
+    label_map = {'positive': 2, 'neutral': 1, 'negative': 0}
+    df['label'] = df['sentiment'].map(label_map)
+
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(df['clean_text'], df['label'], test_size=0.2, random_state=42)
+
+    # Vectorize
+    vectorizer = TfidfVectorizer()
+    X_train_tfidf = vectorizer.fit_transform(X_train)
+    X_test_tfidf = vectorizer.transform(X_test)
+
+    # Train classifier
+    model = LogisticRegression()
+    model.fit(X_train_tfidf, y_train)
+
+    # Predict
+    y_pred = model.predict(X_test_tfidf)
+
+    # Evaluate
+    print("Classification Report:\n", classification_report(y_test, y_pred, target_names=label_map.keys()))
+    cm = confusion_matrix(y_test, y_pred)
+
+    # Confusion Matrix Plot
+    plt.figure(figsize=(6,4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_map.keys(), yticklabels=label_map.keys())
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+
+if __name__ == "__main__":
+    main()
