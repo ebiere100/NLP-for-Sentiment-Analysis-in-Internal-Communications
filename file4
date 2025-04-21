@@ -1,0 +1,23 @@
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+
+# Reload the exported Excel file
+wb = load_workbook("predicted_sentiment_results.xlsx")
+ws = wb.active
+
+# Header row is 1; data starts from row 2
+green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Light green
+red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")    # Light red
+
+for row in range(2, ws.max_row + 1):
+    actual = ws[f"B{row}"].value
+    predicted = ws[f"C{row}"].value
+
+    if actual == predicted:
+        ws[f"C{row}"].fill = green_fill  # Correct prediction
+    else:
+        ws[f"C{row}"].fill = red_fill    # Incorrect prediction
+
+# Save the formatted Excel
+wb.save("predicted_sentiment_results_colored.xlsx")
+print("🎨 Colored prediction results exported to 'predicted_sentiment_results_colored.xlsx'")
