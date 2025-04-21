@@ -1,0 +1,27 @@
+    # Evaluate
+    y_pred_prob = model.predict(X_test)
+    y_pred = np.argmax(y_pred_prob, axis=1)
+
+    print("Classification Report:\n", classification_report(y_test, y_pred, target_names=label_map.keys()))
+
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_map.keys(), yticklabels=label_map.keys())
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+
+    # Create DataFrame for Export
+    reverse_label_map = {v: k for k, v in label_map.items()}
+    test_messages = X_test  # padded sequences
+    original_texts = tokenizer.sequences_to_texts(test_messages)
+    df_results = pd.DataFrame({
+        'original_message': original_texts,
+        'actual_sentiment': [reverse_label_map[i] for i in y_test],
+        'predicted_sentiment': [reverse_label_map[i] for i in y_pred]
+    })
+
+    # Export prediction results to Excel
+    df_results.to_excel("predicted_sentiment_results.xlsx", index=False)
+    print("✅ Prediction results exported to 'predicted_sentiment_results.xlsx'")
